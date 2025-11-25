@@ -39,21 +39,20 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+      # 1. Build the Image
+      # We tag it 'mlops-image' so we can refer to it in the next step
+      - name: Build Docker Image
+        run: docker build -t mlops-image .
 
-      - name: Install Dependencies
-        # Installs exact versions from requirements.txt
-        run: pip install -r requirements.txt
-
-      - name: Run Pytest
-        # We use a dummy URI so tests don't hit the production server
-        env:
-          MLFLOW_TRACKING_URI: "file:///tmp/mlruns"
-          PYTHONPATH: .
-        run: pytest tests/
+      # 2. Run Tests inside Container
+      # --rm: Clean up container after run
+      # python -m pytest: Runs pytest as a module (fixes path issues automatically)
+      - name: Run Pytest in Docker
+        run: |
+          docker run --rm \
+            -e MLFLOW_TRACKING_URI="file:///tmp/mlruns" \
+            mlops-image \
+            python -m pytest tests/
 
   # ==============================================================================
   # JOB 2: PROVISION INFRASTRUCTURE (Runs on GitHub Cloud)

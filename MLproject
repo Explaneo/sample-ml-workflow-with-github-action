@@ -1,7 +1,7 @@
 name: californian_housing_market
 
-# We do not specify a 'docker_env' here because in our CI/CD pipeline
-# we instruct MLflow to use the existing environment via the flag:
+# We do not specify a 'docker_env' here because CML natively creates instances with docker installed.  
+# Therefore, we instruct MLflow to use the existing environment via the flag:
 # --env-manager=local
 
 entry_points:
