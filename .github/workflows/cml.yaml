@@ -87,7 +87,7 @@ jobs:
         run: |
           cml runner launch \
             --cloud=aws \
-            --cloud-region=eu-west-3 \
+            --cloud-region=eu-west \
             --cloud-type=${{ env.INSTANCE_TYPE }} \
             --labels=cml-runner \
             --idle-timeout=300 # Auto-terminate instance after 5 mins of silence
