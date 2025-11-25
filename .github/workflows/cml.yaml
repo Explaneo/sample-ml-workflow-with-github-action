@@ -88,7 +88,7 @@ jobs:
           cml runner launch \
             --cloud=aws \
             --cloud-region=eu-west-3 \
-            --cloud-image=ami-049442a6cf8319180 \
+            --cloud-image=ubuntu \
             --cloud-type=${{ env.INSTANCE_TYPE }} \
             --labels=cml-runner \
             --idle-timeout=300 # Auto-terminate instance after 5 mins of silence
