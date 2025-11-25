@@ -1,0 +1,120 @@
+name: Continuous Training Pipeline
+
+# ==============================================================================
+# 1. TRIGGERS
+# ==============================================================================
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  repository_dispatch:
+    types: [trigger-training]
+  workflow_dispatch:
+    inputs:
+      ec2_instance_type:
+        description: 'AWS EC2 Instance Type'
+        required: true
+        default: 't3.micro'
+        type: choice
+        options:
+          - t3.micro    # Free Tier (1GB RAM)
+          - t3.medium   # Paid (Standard)
+          - g4dn.xlarge # GPU
+
+jobs:
+
+  # ==============================================================================
+  # JOB 2: PROVISION INFRASTRUCTURE
+  # ==============================================================================
+  deploy-runner:
+    name: "2. Provision EC2 Runner"
+    needs: run-tests
+    runs-on: ubuntu-latest
+    env:
+      REPO_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v3
+      
+      # FIX 1: MUST use v2 to get a working Terraform binary
+      - uses: iterative/setup-cml@v2
+
+      - name: Set Instance Type
+        run: |
+          if [ -z "${{ inputs.ec2_instance_type }}" ]; then
+            echo "INSTANCE_TYPE=t3.medium" >> $GITHUB_ENV
+            echo "📢 Auto-trigger detected. Defaulting to t3.medium"
+          else
+            echo "INSTANCE_TYPE=${{ inputs.ec2_instance_type }}" >> $GITHUB_ENV
+            echo "📢 Manual selection: ${{ inputs.ec2_instance_type }}"
+          fi
+      
+      - name: Launch AWS EC2 Instance
+        run: |
+          # FIX 2: Use this specific search string.
+          # It tells AWS: "Find the latest Ubuntu 22.04 image from Canonical (Owner ID 099720109477)"
+          
+          cml runner launch \
+            --cloud=aws \
+            --cloud-region=eu-west-3 \
+            --cloud-type=${{ env.INSTANCE_TYPE }} \
+            --cloud-image="ubuntu@099720109477:x86_64:ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" \
+            --labels=cml-runner \
+            --idle-timeout=300
+
+  # ==============================================================================
+  # JOB 3: CONTINUOUS TRAINING
+  # ==============================================================================
+  train-model:
+    name: "3. Train & Report (CT)"
+    needs: deploy-runner
+    runs-on: [self-hosted, cml-runner]
+    
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    container:
+      image: python:3.11-slim
+    
+    env:
+      REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_EXPERIMENT_NAME: "california_housing"
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      # FIX 3: Must match the version used to create the runner (v2)
+      - uses: iterative/setup-cml@v2
+      
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Train via MLProject
+        run: |
+          mlflow run . \
+            --env-manager=local \
+            -P n_estimators=100 \
+            -P criterion="squared_error"
+
+      - name: Create CML Report
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        run: |
+          echo "## 🤖 Model Training Report" > report.md
+          echo "Training executed on AWS EC2 instance." >> report.md
+          echo "" >> report.md
+          echo "| Metric | Status |" >> report.md
+          echo "| :--- | :--- |" >> report.md
+          echo "| **CI Tests** | ✅ Passed |" >> report.md
+          echo "| **Infrastructure** | AWS EC2 (eu-west-3) |" >> report.md
+          echo "" >> report.md
+          echo "### 🔗 [View Full Run in MLflow](${{ secrets.MLFLOW_TRACKING_URI }})" >> report.md
+          
+          cml comment create report.md
