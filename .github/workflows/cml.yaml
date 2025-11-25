@@ -70,7 +70,7 @@ jobs:
       TF_LOG_PROVIDER: DEBUG
     steps:
       - uses: actions/checkout@v3
-      - uses: iterative/setup-cml@v2
+      - uses: iterative/setup-cml@v1
 
       - name: Set Instance Type
         run: |
@@ -89,8 +89,7 @@ jobs:
             --cloud=aws \
             --cloud-region=us-west \
             --cloud-type=${{ env.INSTANCE_TYPE }} \
-            --labels=cml-runner \
-            --idle-timeout=300 # Auto-terminate instance after 5 mins of silence
+            --labels=cml-runner
 
   # ==============================================================================
   # JOB 3: CONTINUOUS TRAINING (Runs on EC2)
