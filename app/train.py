@@ -62,19 +62,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Random Forest Training Script")
     parser.add_argument("--n_estimators", type=int, default=100)
     parser.add_argument("--criterion", type=str, default="squared_error")
+    parser.add_argument("--experiment_name", type=str, default="california_housing")
     args = parser.parse_args()
-
-    # 2. Setup MLflow Context via Environment Variables
-    # We allow the environment to dictate where this runs.
-    # Default to "Default" if variable is missing (safe fallback).
-    experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", "california_housing")
     
     # Optional: If you want to force using ID, you would grab MLFLOW_EXPERIMENT_ID
     # But as discussed, Name is safer for portability.
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
-    mlflow.set_experiment(experiment_name)
+    mlflow.set_experiment(args.experiment_name)
     
-    print(f"🚀 Starting MLflow Run in experiment: {experiment_name}")
+    print(f"🚀 Starting MLflow Run in experiment: {args.experiment_name}")
 
     # 3. Configuration
     DATA_URL = "https://julie-2-next-resources.s3.eu-west-3.amazonaws.com/full-stack-full-time/linear-regression-ft/californian-housing-market-ft/california_housing_market.csv"
