@@ -1,8 +1,10 @@
 name: californian_housing_market
 
-# We do not specify a 'docker_env' here because CML natively creates instances with docker installed.  
-# Therefore, we instruct MLflow to use the existing environment via the flag:
-# --env-manager=local
+# 1. Use Docker Environment
+# Since you are building the image dynamically with --build-image, 
+# you just need a basic Dockerfile pointer.
+docker_env:
+  image: python:3.11-slim 
 
 entry_points:
   main:
@@ -11,5 +13,5 @@ entry_points:
       criterion: {type: string, default: "squared_error"}
       experiment_name: {type: string, default: "california_housing"}
     
-    # This command maps the MLProject parameters to the python script arguments
+    # 2. The Command
     command: "python app/train.py --n_estimators {n_estimators} --criterion {criterion} --experiment_name {experiment_name}"
