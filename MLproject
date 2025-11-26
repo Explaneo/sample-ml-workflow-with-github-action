@@ -4,7 +4,7 @@ name: californian_housing_market
 # Since you are building the image dynamically with --build-image, 
 # you just need a basic Dockerfile pointer.
 docker_env:
-  image: python:3.11-slim 
+  image: california_housing_training
 
 entry_points:
   main:
