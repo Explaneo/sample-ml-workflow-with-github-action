@@ -1,57 +1,72 @@
 name: Continuous Training Pipeline
 
-# ==============================================================================
-# 1. TRIGGERS
-# ==============================================================================
 on:
-  # Trigger A: Code Changes (The "Developer" Loop)
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
-  # Trigger B: Data Changes (The "Airflow" Loop)
   repository_dispatch:
     types: [trigger-training]
-
-  # NEW: Add Inputs for Manual Trigger
   workflow_dispatch:
-    inputs:
-      ec2_instance_type:
-        description: 'AWS EC2 Instance Type'
-        required: true
-        default: 't3.micro' # Default to Free Tier safe option
-        type: choice
-        options:
-          - t3.micro    # Free Tier (1GB RAM) - Good for debugging
-          - t3.medium   # Paid (~$0.04/hr) - Good for small training
-          - g4dn.xlarge # GPU (~$0.50/hr) - Real Deep Learning
 
 jobs:
   # ==============================================================================
-  # JOB 1: CI GATEKEEPER (Runs on GitHub Cloud)
-  # Goal: Catch bugs cheaply before provisioning expensive EC2 infrastructure.
+  # JOB 1: BUILD, TEST & PUSH (The "Artifact Factory")
   # ==============================================================================
-  run-tests:
-    name: "1. Unit Tests (CI)"
-    runs-on: ubuntu-latest # <--- Standard GitHub Runner (Free tier)
+  build-and-push:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # 1. Build the Image
-      # We tag it 'mlops-image' so we can refer to it in the next step
-      - name: Build Docker Image
-        run: docker build -t mlops-image .
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 2. Run Tests inside Container
-      # --rm: Clean up container after run
-      # python -m pytest: Runs pytest as a module (fixes path issues automatically)
-      - name: Run Pytest in Docker
+      - name: Build Docker Image
+        # We tag it with the Commit SHA (for precise versioning) AND 'latest'
         run: |
+          IMAGE_ID=${{ secrets.DOCKER_USERNAME }}/sample-ml-workflow
+          
+          docker build -t $IMAGE_ID:${{ github.sha }} .
+          docker tag $IMAGE_ID:${{ github.sha }} $IMAGE_ID:latest
+
+      - name: Run Tests in Docker
+        # We test the EXACT image we just built. 
+        # If this fails, we never push to Docker Hub.
+        run: |
+          IMAGE_ID=${{ secrets.DOCKER_USERNAME }}/sample-ml-workflow
+          
           docker run --rm \
             -e MLFLOW_TRACKING_URI="file:///tmp/mlruns" \
-            mlops-image \
+            $IMAGE_ID:${{ github.sha }} \
             python -m pytest tests/
 
-  
+      - name: Push to Docker Hub
+        # Only push if tests passed AND we are on the main branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          IMAGE_ID=${{ secrets.DOCKER_USERNAME }}/sample-ml-workflow
+          
+          docker push $IMAGE_ID:${{ github.sha }}
+          docker push $IMAGE_ID:latest
+
+  # ==============================================================================
+  # JOB 2: TRIGGER AIRFLOW (Optional - if you have the bridge)
+  # ==============================================================================
+  # trigger-airflow:
+  #   needs: build-and-push
+  #   if: github.ref == 'refs/heads/main'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Trigger Airflow DAG
+  #       env:
+  #         AIRFLOW_URL: ${{ secrets.AIRFLOW_URL }}
+  #         AIRFLOW_USER: ${{ secrets.AIRFLOW_USERNAME }}
+  #         AIRFLOW_PASS: ${{ secrets.AIRFLOW_PASSWORD }}
+  #         DAG_ID: "github_ec2_ml_training"
+  #       run: |
+  #         # (Your curl command to trigger Airflow goes here)
+  #         echo "Triggering Airflow to pull image: ${{ secrets.DOCKER_USERNAME }}/sample-ml-workflow:latest"

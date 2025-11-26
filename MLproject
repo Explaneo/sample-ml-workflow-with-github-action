@@ -4,7 +4,7 @@ name: californian_housing_market
 # Since you are building the image dynamically with --build-image, 
 # you just need a basic Dockerfile pointer.
 docker_env:
-  image: california_housing_training
+  image: jedha/sample-ml-workflow:latest
 
 entry_points:
   main:
