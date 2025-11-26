@@ -88,55 +88,9 @@ jobs:
           cml runner launch \
             --cloud=aws \
             --cloud-region=eu-west-3 \
-            --cloud-image=nvidia \
             --cloud-type=${{ env.INSTANCE_TYPE }} \
             --labels=cml-runner
 
-  # ==============================================================================
-  # JOB 3: CONTINUOUS TRAINING (Runs on EC2)
-  # Goal: Execute training on the specific machine we just created.
-  # ==============================================================================
-  train-model:
-    name: "3. Train & Report (CT)"
-    needs: deploy-runner # <--- Wait for EC2 to be ready
-    runs-on: [self-hosted, cml-runner] # <--- TARGETS THE EC2 INSTANCE
-    
-    # Permissions needed for CML to comment on PRs
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      id-token: write
-
-    # Run inside a clean Docker container on the EC2 instance
-    container:
-      image: python:3.11-slim
-    
-    # Inject Secrets for the Training Script
-    env:
-      REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
-      MLFLOW_EXPERIMENT_NAME: "california_housing" # Env Var for train.py
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-    steps:
-      - uses: actions/checkout@v3
-
-      # We need CML installed inside the container to send the report
-      - uses: iterative/setup-cml@v1
-      
-      - name: Install Dependencies
-        run: pip install -r requirements.txt
-
-      - name: Train via MLProject
-        # We use 'mlflow run' to execute the MLProject file.
-        # --env-manager=local tells it to use the pip packages we just installed.
-        run: |
-          mlflow run . \
-            --env-manager=local \
-            -P n_estimators=100 \
-            -P criterion="squared_error"
 
       # ==============================================================================
       # REPORTING (GitOps)
