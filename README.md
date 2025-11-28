@@ -350,6 +350,101 @@ docker run --rm \
 
 **Why Docker?** It ensures your code runs identically on your laptop, CI server, and production—no "works on my machine" issues.
 
+### Step 8: Configure Environment Variables (For Full Workflow)
+
+For local development and testing, you may only need `MLFLOW_TRACKING_URI`. However, if you want to use the complete CI/CD pipeline with Airflow integration, you'll need to configure several environment variables. Here's a template showing what each variable does and example values:
+
+#### Local Development Variables
+
+Create a `.env` file in the project root (and add it to `.gitignore` to keep secrets safe):
+
+```bash
+# MLflow Configuration
+MLFLOW_TRACKING_URI="file:///tmp/mlruns"                    # Local file system
+# OR for remote server:
+# MLFLOW_TRACKING_URI="http://your-mlflow-server:5000"     # Remote MLflow server URL
+
+# Optional: Use specific experiment ID instead of name
+MLFLOW_EXPERIMENT_ID="12345678-abcd-1234-efgh-123456789abc"  # UUID format
+```
+
+#### CI/CD Pipeline Variables (GitHub Secrets)
+
+These are configured in GitHub repository settings under **Secrets and variables → Actions**. They're used by the GitHub Actions workflow:
+
+```bash
+# Docker Hub Credentials (for pushing built images)
+DOCKER_USERNAME="your-dockerhub-username"                   # Your Docker Hub account name
+DOCKER_PASSWORD="dckr_pat_xxxxxxxxxxxxxxxxxxxx"            # Docker Hub Personal Access Token
+
+# Airflow Integration (for triggering remote DAGs)
+AIRFLOW_URL="https://your-airflow-instance.ngrok-free.app"  # Airflow web server URL
+AIRFLOW_USERNAME="airflow_user"                             # Airflow admin username
+AIRFLOW_PASSWORD="your_airflow_password"                    # Airflow admin password
+
+# AWS Credentials (if your Airflow DAG uses AWS services)
+AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"                   # AWS access key
+AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # AWS secret key
+
+# GitHub Personal Access Token (for repository access from CI/CD)
+PERSONAL_ACCESS_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # GitHub PAT with repo permissions
+```
+
+#### Quick Reference Table
+
+| Variable | Used For | Required When | Example Format |
+|----------|----------|---------------|----------------|
+| `MLFLOW_TRACKING_URI` | Connecting to MLflow server | Always (local or remote) | `file:///tmp/mlruns` or `http://server:5000` |
+| `MLFLOW_EXPERIMENT_ID` | Specific experiment (optional) | Only if using ID instead of name | UUID string |
+| `DOCKER_USERNAME` | Docker Hub authentication | When pushing to Docker Hub | Your Docker Hub username |
+| `DOCKER_PASSWORD` | Docker Hub authentication | When pushing to Docker Hub | Docker Hub PAT token |
+| `AIRFLOW_URL` | Airflow API endpoint | When triggering Airflow DAGs | `https://airflow.example.com` |
+| `AIRFLOW_USERNAME` | Airflow authentication | When triggering Airflow DAGs | Airflow user account |
+| `AIRFLOW_PASSWORD` | Airflow authentication | When triggering Airflow DAGs | Airflow password |
+| `AWS_ACCESS_KEY_ID` | AWS services access | If using S3/EC2/etc. | AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | AWS services access | If using S3/EC2/etc. | AWS secret key |
+| `PERSONAL_ACCESS_TOKEN` | GitHub API access | If CI/CD needs repo access | GitHub PAT |
+
+#### Setting Variables Locally
+
+**Option 1: Export in your shell session**
+```bash
+export MLFLOW_TRACKING_URI="file:///tmp/mlruns"
+export AIRFLOW_URL="https://your-airflow-url.com"
+# ... etc
+```
+
+**Option 2: Create a `.env` file and load it** (recommended)
+```bash
+# Create .env file with your variables
+cat > .env << EOF
+MLFLOW_TRACKING_URI=file:///tmp/mlruns
+AIRFLOW_URL=https://your-airflow-url.com
+AIRFLOW_USERNAME=airflow_user
+AIRFLOW_PASSWORD=your_password
+EOF
+
+# Load variables (add to your ~/.zshrc or ~/.bashrc for persistence)
+export $(cat .env | xargs)
+```
+
+**Option 3: Use python-dotenv** (if using a library that supports it)
+```python
+from dotenv import load_dotenv
+load_dotenv()  # Loads variables from .env file
+```
+
+#### Setting Variables in GitHub Actions
+
+GitHub Actions uses **Repository Secrets** (not environment variables in your code). To add them:
+
+1. Go to your GitHub repository
+2. Click **Settings** → **Secrets and variables** → **Actions**
+3. Click **New repository secret**
+4. Add each variable name and value
+
+**⚠️ Security Note:** Never commit `.env` files or hardcode secrets in your code. Always use environment variables or secret management tools (like GitHub Secrets) for sensitive information.
+
 ---
 
 ## 🎓 Next Steps for Learning
