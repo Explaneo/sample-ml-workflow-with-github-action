@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 # ------------------------------------------------------------------
 # CONFIGURATION
 # ------------------------------------------------------------------
-AIRFLOW_URL = os.getenv("AIRFLOW_URL").strip('/')  # Nettoie les slashs
+AIRFLOW_URL = os.getenv("AIRFLOW_URL").strip('/') 
 USERNAME = os.getenv("AIRFLOW_USER")
 PASSWORD = os.getenv("AIRFLOW_PASS")
 DAG_ID = os.getenv("DAG_ID", "github_ec2_ml_training")
@@ -20,15 +20,15 @@ if not AIRFLOW_URL:
 # Headers essentiels pour Ngrok et l'API
 HEADERS = {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true"  # Bypasses Ngrok's landing page
+    "ngrok-skip-browser-warning": "true"  # INDISPENSABLE pour Ngrok
 }
 
 def trigger_dag():
     """
-    Déclenche le DAG en utilisant Basic Auth (Ancienne version v1)
+    Déclenche le DAG en utilisant l'API v2 (Standard Airflow 3)
     """
-    # Endpoint standard API v1
-    trigger_url = f"{AIRFLOW_URL}/api/v1/dags/{DAG_ID}/dagRuns"
+    # MODIFICATION ICI : v1 -> v2
+    trigger_url = f"{AIRFLOW_URL}/api/v2/dags/{DAG_ID}/dagRuns"
     
     print(f"🚀 Triggering DAG: {DAG_ID} at {trigger_url}")
     
@@ -39,7 +39,6 @@ def trigger_dag():
     }
 
     try:
-        # L'argument auth=(USERNAME, PASSWORD) gère automatiquement le header Basic Auth
         response = requests.post(
             trigger_url, 
             json=payload, 
@@ -48,16 +47,18 @@ def trigger_dag():
             timeout=15
         )
         
-        # Gestion des erreurs spécifiques
+        # Gestion des erreurs spécifique à la v2
         if response.status_code == 404:
-            print("❌ Error 404: DAG not found or API endpoint incorrect.")
+            print("❌ Error 404: DAG not found. Verify DAG_ID is correct and DAG is unpaused.")
         elif response.status_code == 405:
-            print("❌ Error 405: Method Not Allowed. Check if API is enabled in Airflow config.")
+            print("❌ Error 405: Method Not Allowed. Confirm Airflow 3 is using /api/v2/.")
         
         response.raise_for_status()
         
         data = response.json()
-        print(f"✅ Success! Run ID: {data.get('dag_run_id')}")
+        # Dans l'API v2, le champ peut être 'dag_run_id' ou 'run_id'
+        run_id = data.get('dag_run_id') or data.get('run_id')
+        print(f"✅ Success! Run ID: {run_id}")
         
     except Exception as e:
         print(f"❌ Trigger Failed: {e}")
